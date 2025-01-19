@@ -116,7 +116,7 @@ def load_csv_data(filename):
         for row in reader:
             # Check if the first column contains '1'
             if row[0] == '1':
-                dropdown_values.append(row[1])  # First column for the dropdown (this would be '1' in this case)
+                dropdown_values.append(row[1])  # First column for the dropdown 
                 corresponding_values.append(row[2])  # Second column for the value to insert
                 update_status_message("CSV Read...","info")
     return dropdown_values, corresponding_values
@@ -488,7 +488,7 @@ def save_note(type):
 
 def copy_to_clipboard():
     # Get the content of the Text widget
-    text_content = note_area.get("1.0", tk.END)  # Start from "1.0" (first character) to the end
+    text_content = note_area.get("1.0", tk.END)  
     root.clipboard_clear()  # Clear the clipboard before adding new content
     root.clipboard_append(text_content)  # Append the content to the clipboard
     root.update()
@@ -677,8 +677,8 @@ def save_settings(theme_var, spell_check_var, debug_var, font_size_var, api1, ap
     api2 = api2.get()
     timer_value = timer_value.get()
     email_tab_value = email_tab_value.get()
-    # Print the settings to verify (replace this with saving to a file or applying settings)
-    # config.settings[""]
+    # Print the settings to verify 
+
     # Update the settings dictionary and write to CSV
     settings["spell_check"] = str(sc_enabled)  # Convert boolean to string for CSV
     settings["enable_timer"] = str(timer_value)  # Convert boolean to string for CSV
@@ -733,14 +733,13 @@ def update_timer():
             minutes, seconds = divmod(time_left, 60)
             time_str = f"{minutes:02}:{seconds:02}"
             timer_label.config(text=time_str)
-                        # Background color changes based on time remaining
-            if time_left <= 10 * 60:  # Flash red at 10 minutes
+            if time_left <= 10 * 60:  
                 set_background("red")
-            elif time_left <= 15 * 60:  # Change to red at 15 minutes
+            elif time_left <= 15 * 60:  
                 set_background("orange")
-            elif time_left <= 25 * 60:  # Change to orange at 20 minutes
+            elif time_left <= 25 * 60:  
                 set_background("yellow")
-            elif time_left <= 30 * 60:  # Change to yellow at 30 minutes
+            elif time_left <= 30 * 60: 
                 set_background("#1e1e2f")
             else:
                 reset_background()
@@ -774,12 +773,12 @@ def reset_timer():
     global timer_running, time_left, flash_timer
     flash_timer = False
     timer_running = False
-    time_left = time_in_mins * 60  # Reset to 45 minutes
+    time_left = time_in_mins * 60  
     timer_label.config(text="40:00")
     start_button.config(text="Start", state=tk.NORMAL)
 
 def populate_cases_menu():
-    global cases_menu  # Make it accessible globally
+    global cases_menu  
 
     folder_path = "open_cases"  # Path to the folder
     cases_menu.delete(0, tk.END)  # Clear the menu first
@@ -880,7 +879,6 @@ def load_timer():
     if timer_enabled == "True":
         # Check if the timer elements already exist
         if 'timer_label' in globals() and timer_label.winfo_exists():
-        # Timer is already created, so don't recreate it
             return
         # Timer label (Initially set to 45:00)
         timer_label = tk.Label(top_frame, text="40:00", font=("Helvetica", 20), bg="#1e1e2f", fg="#ffffff")
@@ -903,8 +901,6 @@ def load_case_input():
     case_entry = tk.Entry(input_frame, width=60, font=("Helvetica", 12))
     case_entry.pack(side=tk.LEFT, padx=5)
     apply_dark_theme(case_entry)
-
-# - - Tab Pages - -
 
 # General Tab
 def load_general_tab():
@@ -1038,9 +1034,8 @@ def load_search_tab():
 # Email Tab
 def load_email_tab(process=0):
     global emailSender, emailRecipient, emailSubject, emailAttachments
-
+    # I need to rework this why did I do it like this???? :(
     if process:
-        # Clear the specific email input field
         match process:
             case 1:
                 emailSender.delete(0, tk.END)
@@ -1089,12 +1084,10 @@ def load_email_tab(process=0):
 
 # Other Tab
 def load_other_tab():
+    # Will use this tab for future additions, maybe IDM-XFORCE?? 
     othertab = ttk.Frame(tab_control)
     tab_control.add(othertab, text="Other")
 
-
-
-# - - Other - - 
 
 # Right click menu
 def show_context_menu(event):
@@ -1170,6 +1163,8 @@ def start_program():
     context_menu.add_command(label="Clear All", command=clear_input)
     context_menu.add_separator()
     submenu = tk.Menu(context_menu, tearoff=0)
+    # Sub menu for future options, maybe search or prefilled fields?
+
     #submenu.add_command(label="Option 1", command=testerFunc)
     #submenu.add_command(label="Option 2", command=lambda: print("Option 2 selected"))
     #context_menu.add_cascade(label="More Options", menu=submenu)
