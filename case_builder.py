@@ -13,8 +13,83 @@ import      json
 
 
 FOLDER_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'saved_notes')
-
 spell = SpellChecker()
+
+def get_version_from_github():
+    github_url = "https://raw.githubusercontent.com/CollettoS/Case-Builder/main/config.csv"
+    try:
+        response = requests.get(github_url)
+        response.raise_for_status()  # Will raise an error for bad responses (e.g., 404)
+        
+        # Parse the CSV from the raw GitHub content
+        reader = csv.DictReader(response.text.splitlines())
+        for row in reader:
+            if row.get("setting_name") == "version":
+                return row.get("setting_value")
+    except requests.exceptions.RequestException as e:
+        messagebox.showerror("Error", f"Failed to fetch version from GitHub: {e}")
+        return None
+
+def compare_versions(proc=1):
+    global up_to_date, local_version, github_version
+    """Compare the version in local config.csv with the GitHub version."""
+    local_version = settings.get("version")
+    github_version = get_version_from_github()
+    if proc == 1:
+        if local_version is None or github_version is None:
+            return  # If either version is not available, exit early
+        
+        if local_version == github_version:
+            up_to_date = True
+        else:
+            show_version_update_message(local_version, github_version)
+    if proc == 2:
+        if local_version is None or github_version is None:
+            msg = f"V{local_version}"
+            return msg
+        
+        if local_version == github_version:
+            msg = f"V{local_version}"
+            return msg
+        else:
+            msg = f"V{local_version} - New update Available: V{github_version}"
+            return msg
+        
+def show_version_update_message(local_version, github_version):
+    # Create a new top-level window
+    window = tk.Toplevel()
+    window.title("Version Update Available")
+    
+    # Create a label with formatted text
+    message = (
+        f"Current version: \tV{local_version}\n"
+        f"Latest version: \tV{github_version}\n\n"
+        "Please update your tool by visiting the link below:\n"
+        "Replace your current files with the updated ones."
+    )
+    m_bold_font = ("Helvetica", 10, "bold")
+
+    label = tk.Label(window, font=m_bold_font, text="A new update is available!", justify="center")
+    label.pack(padx=10, pady=10)
+    label = tk.Label(window, text=message, justify="left")
+    label.pack(padx=10, pady=10)
+    
+    github_link = "https://github.com/CollettoS/Case-Builder"
+    link_label = tk.Label(window, text=github_link, fg="blue", cursor="hand2")
+    link_label.pack(padx=10, pady=5)
+
+    def open_github_link(event):
+        webbrowser.open(github_link)
+    
+    # Bind the click event to open GitHub
+    link_label.bind("<Button-1>", open_github_link)
+    
+    # Add a close button
+    close_button = tk.Button(window, text="Close", command=window.destroy)
+    close_button.pack(pady=10)
+    
+    # Show the window
+    window.mainloop()
 
 def get_country_name(country_code):
     try:
@@ -1119,7 +1194,8 @@ def addButtons(loc):
 def start_program():
     global root, status_label, top_frame, text_font, menu_bar, bold_font, note_area, tab_control, context_menu
     root = tk.Tk()
-    root.title("Case Note Builder - Tool by Sam Collett")
+    version_text = compare_versions(2)
+    root.title(f"Case Note Builder - Tool by Sam Collett - {version_text}")
     root.geometry("800x600")
     root.update_idletasks()
     root.configure(bg="#1e1e2f")
@@ -1201,4 +1277,5 @@ flash_timer     = False
 
 if __name__ == "__main__":
     start_program()
+    compare_versions(1)
     root.mainloop()
