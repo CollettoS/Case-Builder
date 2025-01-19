@@ -1,0 +1,11 @@
+setting_name,setting_value
+spell_check,True
+debug_mode,False
+auto_save,False
+enable_timer,True
+enable_email_tab,True
+theme,Dark
+version,0.8
+font_size,12
+abuseipdb_api,xxx
+vt_api,xxx
