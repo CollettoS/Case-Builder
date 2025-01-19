@@ -687,8 +687,9 @@ def open_settings_menu(root, proc=0):
         notebook.pack(fill="both", expand=True, padx=10, pady=10)
 
         # ---- General Tab ----
+        version = compare_versions(2)
         tk.Label(general_tab, text="General Settings", font=("Arial", 14), bg="#1e1e2f", fg="white").pack(anchor="w", pady=5)
-
+        tk.Label(general_tab, text=f"Case Builder: {version}", bg="#1e1e2f", fg="white").pack(anchor="w", pady=(10, 5))
         tk.Label(general_tab, text="Enable Features:", bg="#1e1e2f", fg="white").pack(anchor="w", pady=(10, 5))
 
         def get_t_or_f(a, setting_value):
@@ -876,8 +877,13 @@ def populate_cases_menu():
             cases_menu.add_separator()
             cases_menu.add_command(label="Add new case", command=add_new_case)
     except FileNotFoundError:
-        messagebox.showerror("Error", f"Folder '{folder_path}' not found.")
-        cases_menu.add_command(label="Folder not found", state=tk.DISABLED)
+        folder_path = "open_cases"
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+            populate_cases_menu()
+        else:
+            messagebox.showerror("Error", f"Folder '{folder_path}' not found.")
+            cases_menu.add_command(label="Folder not found", state=tk.DISABLED)
 # Function to open a selected case
 def open_case(file_name):
     change_case()
@@ -963,6 +969,9 @@ def load_timer():
         start_button = tk.Button(top_frame, text="Start", font=("Helvetica", 12), command=lambda: toggle_timer())
         start_button.pack(side=tk.RIGHT, padx=10)
     else:
+        timer_label = tk.Label(top_frame, text="", font=("Helvetica", 20), bg="#1e1e2f", fg="#ffffff")
+        start_button = tk.Button(top_frame, text="", font=("Helvetica", 12), command=lambda: toggle_timer())
+
         timer_label.destroy()
         start_button.destroy()
 # Case name input area

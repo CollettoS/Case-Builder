@@ -5,7 +5,7 @@ Download and install the latest version of Python from the [Windows Store](https
 
 ### 2. Install Required Packages
 Open the command prompt and run the following command to install the required Python packages:
-```bash
+```
 pip install requests pyspellchecker pycountry
 ```
 
@@ -17,7 +17,7 @@ pip install requests pyspellchecker pycountry
 1. Navigate to the folder where `case_builder.py` is located.
 2. Right-click and open the terminal in that folder.
 3. Run the program by typing:
-   ```bash
+   ```
    python case_builder.py
    ```
 
