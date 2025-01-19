@@ -5,7 +5,7 @@ auto_save,False
 enable_timer,True
 enable_email_tab,True
 theme,Dark
-version,0.8.3
+version,0.8.4
 font_size,12
 abuseipdb_api,xxx
 vt_api,xxx

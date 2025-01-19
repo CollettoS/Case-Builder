@@ -969,11 +969,11 @@ def load_timer():
         start_button = tk.Button(top_frame, text="Start", font=("Helvetica", 12), command=lambda: toggle_timer())
         start_button.pack(side=tk.RIGHT, padx=10)
     else:
-        timer_label = tk.Label(top_frame, text="", font=("Helvetica", 20), bg="#1e1e2f", fg="#ffffff")
-        start_button = tk.Button(top_frame, text="", font=("Helvetica", 12), command=lambda: toggle_timer())
+        if 'timer_label' in globals() and timer_label.winfo_exists():
+            timer_label.destroy()
+        if 'start_button' in globals() and start_button.winfo_exists():
+            start_button.destroy()
 
-        timer_label.destroy()
-        start_button.destroy()
 # Case name input area
 def load_case_input():
     global case_entry
