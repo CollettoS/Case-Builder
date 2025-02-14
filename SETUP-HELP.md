@@ -6,7 +6,7 @@ Download and install the latest version of Python from the [Windows Store](https
 ### 2. Install Required Packages
 Open the command prompt and run the following command to install the required Python packages:
 ```
-pip install requests pyspellchecker pycountry Pillow
+pip install customtkinter requests pyspellchecker pycountry Pillow
 ```
 
 ### 3. Get API Keys

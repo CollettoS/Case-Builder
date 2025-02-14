@@ -1,8 +1,8 @@
 setting_name,setting_value
-spell_check,FALSE
-debug_mode,FALSE
+spell_check,False
+debug_mode,False
 theme,Dark
-version,1.0.1
+version,1.0.2
 msg,None
 font_size,12
 abuseipdb_api,xxx

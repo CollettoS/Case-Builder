@@ -23,7 +23,7 @@ FOLDER_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'saved_n
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 spell = SpellChecker()
-
+case_entities_list = {}
 root = None
 # Debugging ->
 # Templates:
@@ -80,7 +80,7 @@ def update_status_message(message, message_type="info"):
 
 # File Functions
 # Search files
-def search_files(type=1, search="None"):
+def search_files(type=1, search="None", ent_type="Unkown"):
     times_found = 0
     log_debug_action(f"Search Files Function called - Type: {type} - Search: {search}")
     if type == 1:
@@ -119,7 +119,7 @@ def search_files(type=1, search="None"):
         else:
             messagebox.showinfo("No Results", "No files matched the search term!")
     elif type==2:
-        add_row(search_term, f"{times_found} times", "")
+        add_row(ent_type, search_term, f"{times_found} times", "")
         if matching_files:
             update_status_message(f"{search_term}: observed before!","flash")
 # Open file from results list
@@ -283,9 +283,9 @@ def add_user():
         email_entry.delete(0, tk.END)
         log_debug_action(f"User, email and role entry cleared")
     if user:
-        search_files(2, user)
+        search_files(2, user, "User")
     if email:
-        search_files(2, email)
+        search_files(2, email, "Email")
 
 # Add host
 def add_host():
@@ -293,7 +293,7 @@ def add_host():
     host_text = f"Host:\t\t\t{host}\n"
     log_debug_action(f"Add host {host}")
     insert_text(host_text)
-    search_files(2, host)
+    search_files(2, host, "Host")
     host_entry.delete(0, tk.END)
     log_debug_action(f"Host entry cleared")
 
@@ -302,7 +302,6 @@ def add_info(info_type, entry_widget):
     info_value = entry_widget.get()
     if info_value:
         log_debug_action(f"Add Info: {info_type}")
-        search_files(2, info_value)
         if info_type:
             match info_type:
                 case "sender":
@@ -323,6 +322,8 @@ def add_info(info_type, entry_widget):
                     emailAttachments.delete(0, ctk.END)
                 case _:
                     update_status_message("Error: Info type unknown", "error")
+            search_files(2, info_value, info_type)
+
 # Function used to format and insert all inputs into the text area
 def insert_text(formatted_text, position="default"):
     log_debug_action(f"Text Insert: {formatted_text} - Position: {position}")
@@ -408,7 +409,7 @@ def scan_ip():
 
         formatted_text += "\n"
         insert_text(formatted_text)
-        search_files(2, ip)
+        search_files(2, ip, "IP")
 
         ip_entry.delete(0, tk.END)
         log_debug_action(f"IP Scan finished - IP entry cleared")
@@ -477,7 +478,6 @@ def scan_hash():
         formatted_text += f"Magic:\t\t\t{file_magic}\n"
         formatted_text += f"TrID:\t\t\t{file_trid}\n"
 
-        search_files(2, file_hash)
 
         # If malicious, display details
         if malicious_found:
@@ -490,6 +490,8 @@ def scan_hash():
         formatted_text += "\n"
         log_debug_action(f"Hash scanned {file_hash} finished")
         insert_text(formatted_text)
+        search_files(2, file_hash, "Hash")
+
         hash_entry.delete(0, tk.END)
 
     except Exception as e:
@@ -630,6 +632,7 @@ def clear_input():
     note_area.delete(1.0, tk.END)
     title_entry.delete(0, tk.END)
     delete_rows()
+    case_entities_list.clear()
     update_status_message("Note area cleared!","warning")
 
 def add_new_case():
@@ -752,10 +755,12 @@ def delete_rows():
     global rows, table_frame
 
     # Loop through each row in the rows list and remove the widgets from the grid
-    for label1, label2, entry in rows:
+    for label0, label1, label2, entry, add_button in rows:
+        label0.grid_forget()
         label1.grid_forget()  # Remove the first label
         label2.grid_forget()  # Remove the second label
         entry.grid_forget()   # Remove the entry widget
+        add_button.grid_forget() # Remove the save button 
 
     # Clear the rows list
     rows.clear()
@@ -764,30 +769,41 @@ def delete_rows():
     table_frame.update_idletasks()
     canvas.config(scrollregion=canvas.bbox("all"))
 
-def add_row(value1="Static 1", value2="Static 2", editable_value=""):
+def add_row(ent_type, value1="Static 1", value2="Static 2", editable_value=""):
     global table_frame, canvas
     row_index = len(rows) + 1  # New row index
+
     
+
+    case_entities_list.update({
+    "type": ent_type,
+    "ent": value1
+    })
+
+    label0 = ctk.CTkLabel(table_frame, text=ent_type)
+    label0.grid(row=row_index, column=0, padx=10, pady=5)
+   
+
     label1 = ctk.CTkLabel(table_frame, text=value1)
-    label1.grid(row=row_index, column=0, padx=10, pady=5)
+    label1.grid(row=row_index, column=1, padx=10, pady=5)
     
     label2 = ctk.CTkLabel(table_frame, text=value2)
-    label2.grid(row=row_index, column=1, padx=10, pady=5)
+    label2.grid(row=row_index, column=2, padx=10, pady=5)
     
     entry = ctk.CTkEntry(table_frame, width=270)
-    entry.grid(row=row_index, column=2, padx=10, pady=5)
+    entry.grid(row=row_index, column=3, padx=10, pady=5)
     entry.insert(0, editable_value)
 
     add_button = ctk.CTkButton(table_frame, text="Save Note", command=lambda: save_or_clear_note(entry, row_index, value1), 
                                 width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_button.grid(row=row_index, column=3, padx=5, sticky="w")
+    add_button.grid(row=row_index, column=4, padx=5, sticky="w")
 
 
     check_and_insert_notes(value1, entry)
     track_entry_changes(entry, row_index)
 
 
-    rows.append((label1, label2, entry))
+    rows.append((label0, label1, label2, entry, add_button))
     table_frame.update_idletasks()
     canvas.config(scrollregion=canvas.bbox("all"))
 
@@ -812,32 +828,29 @@ def check_and_insert_notes(entity, entry):
         
         # If a note was found, insert it into the entry
         if note:
-            print(entity)
+            log_debug_action(entity)
             highlight_entity_in_text(entity)
             entry.delete(0, "end")  # Clear any existing text in the entry
             entry.insert(0, note)   # Insert the note into the entry
             
     except FileNotFoundError:
-        print(f"Error: The file '{csv_file}' was not found.")
+        log_debug_action(f"Error: The file '{csv_file}' was not found.")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        log_debug_action(f"An error occurred: {e}")
 
 original_notes = {}
 
 def highlight_entity_in_text(search_text):
-    print(search_text)
+    log_debug_action(search_text)
     if not search_text.strip():
 
         return  # Don't search for empty strings
     
     start = "1.0"
-    print(note_area.get("1.0", "end"))
 
     while True:
-        print("start")
         start = note_area.search(search_text, start, stopindex="end", nocase=True)
         if not start:
-            print("no start")
             break  # Exit loop if no more matches
         
         end = f"{start}+{len(search_text)}c"  # Calculate end position
@@ -1178,7 +1191,7 @@ def start_program(proc=0):
     scrollbarX.grid(row=30, column=0, columnspan=3, sticky="ewn")
 
     # Table headers
-    headers = ["Entity", "Observed", "Note", "Action"]
+    headers = ["Type","Entity", "Observed", "Note", "Action"]
     for col, text in enumerate(headers):
         label = ctk.CTkLabel(table_frame, text=text, font=("Arial", 14, "bold"))
         label.grid(row=0, column=col, padx=20, pady=5, sticky="w")
@@ -1189,8 +1202,11 @@ def start_program(proc=0):
      #Example: Create a 2x2 grid for buttons at the bottom of the right frame
     button_1 = ctk.CTkButton(general_tab, text="Save Case as", width=100, command=lambda: save_note(2), height=20, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
     button_2 = ctk.CTkButton(general_tab, text="Next Case", width=100, command=next_case, height=20, fg_color="#4CAF50", hover_color="#45A049", font=("Verdana", 12, "bold"))
-    button_3 = ctk.CTkButton(general_tab, text="Copy All", width=100, command=copy_to_clipboard, height=20, fg_color="#FF9800", hover_color="#FF5722", font=("Verdana", 12, "bold"))
+    button_3 = ctk.CTkButton(general_tab, text="Copy All", width=100, command=copy_to_clipboard, height=20, fg_color="#166534", hover_color="#22c55e", font=("Verdana", 12, "bold"))
     button_4 = ctk.CTkButton(general_tab, text="Clear", width=100, command=clear_input, height=20, fg_color="#F44336", hover_color="#D32F2F", font=("Verdana", 12, "bold"))
+
+    button_url = ctk.CTkButton(general_tab, text="Sanatize URLs", width=100, command=lambda: core_functions.miscFuncs.sanitize_urls(note_area), height=20, fg_color="#d97706", hover_color="#f59e0b", font=("Verdana", 12, "bold"))
+    button_url.grid(row=20, column=0, padx=2, pady=2, sticky="ew")  # Top-left button
 
     # Add buttons to a 2x2 grid layout at the bottom of the right frame
     button_1.grid(row=22, column=0, padx=2, pady=2, sticky="ew")  # Top-left button
@@ -1216,7 +1232,6 @@ def start_program(proc=0):
 
 
 if __name__ == "__main__":
-    from core_functions.load_page import load_loading_screen
     global settings
     csv_file = "config.csv"
 

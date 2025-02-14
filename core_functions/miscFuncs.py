@@ -1,6 +1,8 @@
 import      pycountry
 from settings.debug import write_debug
 import webbrowser
+import re
+
 
 def get_country_name(country_code):
     try:
@@ -12,6 +14,20 @@ def get_country_name(country_code):
         return country.name if country else "Unknown"
     except KeyError:
         return "Unknown"
+
+def sanitize_urls(note_area):
+    """Finds and replaces all URLs in the note_area with a safe format."""
+    text = note_area.get("1.0", "end")  # Get all text from the note area
+    url_pattern = r"\b(?:https?://)?(?:www\.)?([\w.-]+\.[a-z]{2,})\b"  # Regex to match URLs
+
+    def replace_url(match):
+        return match.group(1).replace(".", "[.]")  # Convert google.com → google[.]com
+
+    sanitized_text = re.sub(url_pattern, replace_url, text)  # Replace URLs in text
+
+    note_area.delete("1.0", "end")  # Clear existing text
+    note_area.insert("1.0", sanitized_text)  # Insert sanitized text back
+
 
 def open_github():
     webbrowser.open("https://github.com/CollettoS/Case-Builder")  
