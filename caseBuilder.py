@@ -12,11 +12,12 @@ from        datetime import datetime
 import      random
 from        core_functions.miscFuncs import get_country_name
 from        core_functions.version_control import compare_versions
+from        core_functions.case_entities import entitity_manager_window
 from        settings.debug import write_debug as log_debug_action
 from        core_functions.settings_window import open_settings_menu
 import      importlib.util
 from        spellchecker    import      SpellChecker
-
+import      core_functions.miscFuncs
 
 FOLDER_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'saved_notes')
 
@@ -80,6 +81,7 @@ def update_status_message(message, message_type="info"):
 # File Functions
 # Search files
 def search_files(type=1, search="None"):
+    times_found = 0
     log_debug_action(f"Search Files Function called - Type: {type} - Search: {search}")
     if type == 1:
         search_term = search_entry.get()  # Get the search term from the search bar
@@ -105,6 +107,7 @@ def search_files(type=1, search="None"):
                     with open(os.path.join(root, file), 'r', encoding='utf-8', errors='ignore') as f:
                         if search_term.lower() in f.read().lower():
                             matching_files.append(os.path.join(root, file))  # Store full file path
+                            times_found =+ 1
                             continue
                 except:
                     continue  # If there's an error reading the file, skip it
@@ -116,6 +119,7 @@ def search_files(type=1, search="None"):
         else:
             messagebox.showinfo("No Results", "No files matched the search term!")
     elif type==2:
+        add_row(search_term, f"{times_found} times", "")
         if matching_files:
             update_status_message(f"{search_term}: observed before!","flash")
 # Open file from results list
@@ -245,7 +249,6 @@ def add_user():
     user_text = ""
     if user:
         user_text += f"\nUser:\t\t\t{user}"
-        search_files(2, user)
         log_debug_action(f"User - {user}")
         line = 1
     if role:
@@ -279,14 +282,21 @@ def add_user():
         role_entry.delete(0, tk.END)
         email_entry.delete(0, tk.END)
         log_debug_action(f"User, email and role entry cleared")
+    if user:
+        search_files(2, user)
+    if email:
+        search_files(2, email)
+
 # Add host
 def add_host():
     host = host_entry.get()
     host_text = f"Host:\t\t\t{host}\n"
     log_debug_action(f"Add host {host}")
     insert_text(host_text)
-    log_debug_action(f"Host entry cleared")
+    search_files(2, host)
     host_entry.delete(0, tk.END)
+    log_debug_action(f"Host entry cleared")
+
 # Add email info
 def add_info(info_type, entry_widget):
     info_value = entry_widget.get()
@@ -372,7 +382,6 @@ def scan_ip():
 
         update_status_message(f"IP: {ip} has been checked successfully!","success")
         log_debug_action(f"IP: {ip} has been scanned")
-        search_files(2, ip)
         formatted_text = f"IP:\t\t\t{ip}{suspicious_label}\n"
         abuseConfidenceScore = data.get("abuseConfidenceScore", "N/A")
         countryCode     = data.get("countryCode", "N/A")
@@ -399,6 +408,8 @@ def scan_ip():
 
         formatted_text += "\n"
         insert_text(formatted_text)
+        search_files(2, ip)
+
         ip_entry.delete(0, tk.END)
         log_debug_action(f"IP Scan finished - IP entry cleared")
 
@@ -614,8 +625,11 @@ def next_case():
 
 # Clear input area 
 def clear_input():
+    note_area.tag_remove("highlight", "1.0", "end")  # Remove old highlights
+
     note_area.delete(1.0, tk.END)
     title_entry.delete(0, tk.END)
+    delete_rows()
     update_status_message("Note area cleared!","warning")
 
 def add_new_case():
@@ -729,6 +743,180 @@ def copy_to_clipboard():
     log_debug_action(f"CTC - Note area cleared")
     note_area.after(500, lambda: note_area.configure(fg_color="#2d2d44"))
 
+# Entity Table Functions 
+def delete_rows():
+    """
+    Clears all rows in the table.
+    This will remove all dynamically added labels and entries.
+    """
+    global rows, table_frame
+
+    # Loop through each row in the rows list and remove the widgets from the grid
+    for label1, label2, entry in rows:
+        label1.grid_forget()  # Remove the first label
+        label2.grid_forget()  # Remove the second label
+        entry.grid_forget()   # Remove the entry widget
+
+    # Clear the rows list
+    rows.clear()
+
+    # Update the table to reflect the changes
+    table_frame.update_idletasks()
+    canvas.config(scrollregion=canvas.bbox("all"))
+
+def add_row(value1="Static 1", value2="Static 2", editable_value=""):
+    global table_frame, canvas
+    row_index = len(rows) + 1  # New row index
+    
+    label1 = ctk.CTkLabel(table_frame, text=value1)
+    label1.grid(row=row_index, column=0, padx=10, pady=5)
+    
+    label2 = ctk.CTkLabel(table_frame, text=value2)
+    label2.grid(row=row_index, column=1, padx=10, pady=5)
+    
+    entry = ctk.CTkEntry(table_frame, width=270)
+    entry.grid(row=row_index, column=2, padx=10, pady=5)
+    entry.insert(0, editable_value)
+
+    add_button = ctk.CTkButton(table_frame, text="Save Note", command=lambda: save_or_clear_note(entry, row_index, value1), 
+                                width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
+    add_button.grid(row=row_index, column=3, padx=5, sticky="w")
+
+
+    check_and_insert_notes(value1, entry)
+    track_entry_changes(entry, row_index)
+
+
+    rows.append((label1, label2, entry))
+    table_frame.update_idletasks()
+    canvas.config(scrollregion=canvas.bbox("all"))
+
+def check_and_insert_notes(entity, entry):
+    # Path to your CSV file
+    csv_file = 'settings/entity_notes.csv'
+    
+    # Initialize a variable to store the note if found
+    note = ""
+    
+    # Open the CSV file and check if the entity has any notes
+    try:
+        with open(csv_file, mode='r', newline='', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            # Skip the header row if there's one
+            next(reader)
+            
+            for row in reader:
+                if row[0] == entity:  # Check if the entity matches
+                    note = row[1]  # Assuming the note is in the second column
+                    break
+        
+        # If a note was found, insert it into the entry
+        if note:
+            print(entity)
+            highlight_entity_in_text(entity)
+            entry.delete(0, "end")  # Clear any existing text in the entry
+            entry.insert(0, note)   # Insert the note into the entry
+            
+    except FileNotFoundError:
+        print(f"Error: The file '{csv_file}' was not found.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+original_notes = {}
+
+def highlight_entity_in_text(search_text):
+    print(search_text)
+    if not search_text.strip():
+
+        return  # Don't search for empty strings
+    
+    start = "1.0"
+    print(note_area.get("1.0", "end"))
+
+    while True:
+        print("start")
+        start = note_area.search(search_text, start, stopindex="end", nocase=True)
+        if not start:
+            print("no start")
+            break  # Exit loop if no more matches
+        
+        end = f"{start}+{len(search_text)}c"  # Calculate end position
+        note_area.tag_add("highlight", start, end)  # Apply tag
+        
+        start = end  # Move start position to continue searching
+    
+    note_area.tag_config("highlight", foreground="black", background="lightgreen")  # Style the highlight
+
+def track_entry_changes(entry, row_index):
+    """
+    Track the initial note value for each entry when first loaded or checked.
+    """
+    global original_notes
+    original_notes[row_index] = entry.get()  # Store the initial value of the entry for that row
+
+def save_or_clear_note(entry, row_index, entity):
+    """
+    Checks if the entry note has changed, then saves or clears the note accordingly.
+    """
+    global original_notes
+    current_note = entry.get()  # Get the current value of the entry
+
+    # Check if the note has changed from the original note for the specific row
+    if current_note != original_notes.get(row_index, ""):
+        if current_note == "":  # If the entry is cleared
+            log_debug_action(f"Note for {entity} was cleared.")
+            update_note_in_csv(entity, "")  # Clear the note in the CSV (empty note)
+        else:
+            log_debug_action(f"Note for {entity} was changed.")
+            update_note_in_csv(entity, current_note)  # Save the new context to the CSV
+        
+        # Update the original note for that row
+        original_notes[row_index] = current_note
+    else:
+        log_debug_action(f"No change detected for {entity}.")
+
+def update_note_in_csv(entity, new_note):
+    """
+    Update the note for a specific entity in the CSV file.
+    If the entity exists, update the note. If not, add the entity.
+    """
+    rows = []
+    updated = False
+    csv_file = 'settings/entity_notes.csv'
+    
+    # Read the existing CSV file and update the note for the given entity
+    try:
+        with open(csv_file, mode='r', newline='', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            header = next(reader)  # Skip header row
+            rows.append(header)  # Add header back to rows
+
+            # Loop through the rows and find the entity to update
+            for row in reader:
+                if row[0] == entity:
+                    row[1] = new_note  # Update the note for the entity
+                    updated = True
+                rows.append(row)
+    
+    except FileNotFoundError:
+        log_debug_action(f"Error: The file '{csv_file}' was not found.")
+        return
+    
+    # If the entity wasn't found and a note exists, add the new entity
+    if not updated and new_note:
+        rows.append([entity, new_note])
+    
+    # Write the updated rows back to the CSV file
+    try:
+        with open(csv_file, mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerows(rows)
+            log_debug_action(f"CSV file '{csv_file}' updated successfully.")
+    except Exception as e:
+        log_debug_action(f"An error occurred while updating the CSV file: {e}")
+
+
+
 
 def start_program(proc=0):
     global status_label, menu_bar, note_area, title_entry, tab_control, top_frame, cases_menu
@@ -746,7 +934,6 @@ def start_program(proc=0):
     settings = read_settings("config.csv")
     initial_font_size = int(settings.get("font_size"))
     bold_font = font.Font(family="Verdana", weight="bold", size=10)
-
     note_font = ctk.CTkFont(family='Verdana', size=initial_font_size)
 
     # Create the top menu bar using standard Tkinter Menu
@@ -775,10 +962,20 @@ def start_program(proc=0):
     menu_bar.add_cascade(label="SOC Tools", menu=soc_tools_menu)
     load_plugins(soc_tools_menu)
 
+    entities_menu = tk.Menu(menu_bar)
+    menu_bar.add_cascade(label="Case Entities", menu=entities_menu)
+    entities_menu.add_command(label="Add Entitiy", command=entitity_manager_window)
+
+
     from core_functions.about import open_about_window
     help_menu = tk.Menu(menu_bar)
     menu_bar.add_cascade(label="Help", menu=help_menu)
     help_menu.add_command(label="About", command=open_about_window)
+    help_menu.add_command(label="Bug Report", command=core_functions.miscFuncs.bug_report)
+    help_menu.add_command(label="Github", command=core_functions.miscFuncs.open_github)
+    help_menu.add_command(label="Help Docs", command=core_functions.miscFuncs.open_help)
+    help_menu.add_command(label="Message the Devs", command=core_functions.miscFuncs.msg_dev)
+    help_menu.add_command(label="Submit Idea", command=core_functions.miscFuncs.submit_idea)
 
 
     # Frame for the status and timer
@@ -811,7 +1008,7 @@ def start_program(proc=0):
     text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
     # Add a Textbox
-    note_area = ctk.CTkTextbox(text_frame, height=800, wrap=tk.WORD, fg_color="#2d2d44", text_color="#ffffff", font=note_font)
+    note_area = ctk.CTkTextbox(text_frame, height=750, wrap=tk.WORD, fg_color="#2d2d44", text_color="#ffffff", font=note_font)
     note_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
 
@@ -820,8 +1017,11 @@ def start_program(proc=0):
     right_frame.grid(row=0, column=1, sticky="nsew", padx=2, pady=2)
     right_frame.grid_propagate(False)
     
+
+
+
     container_frame.grid_columnconfigure(0, weight=50)  # Left pane takes 70%
-    container_frame.grid_columnconfigure(1, weight=2)  # Right pane takes 30%
+    container_frame.grid_columnconfigure(1, weight=2, minsize=100)  # Right pane takes 30%
 
     # Tab control for the right pane
     tab_control = ctk.CTkTabview(right_frame)
@@ -851,7 +1051,7 @@ def start_program(proc=0):
     topvalue.grid(row=3, column=1, pady=2, sticky="w")
     add_button = ctk.CTkButton(general_tab, text="Add User", command=add_user, 
                                 width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_button.grid(row=4, column=1, pady=(0, 10), sticky="w")
+    add_button.grid(row=4, column=1,padx=(0,20), pady=(0, 10), sticky="ew")
 
     host_label = ctk.CTkLabel(general_tab, text="Host:")
     host_label.grid(row=5, column=0, padx=2, pady=2, sticky="w")
@@ -859,7 +1059,7 @@ def start_program(proc=0):
     host_entry.grid(row=5, column=1, padx=2, pady=2, sticky="w")
     add_button = ctk.CTkButton(general_tab, text="Add Host", command=add_host, 
                                 width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_button.grid(row=6, column=1, pady=(0, 10), sticky="w")
+    add_button.grid(row=6, column=1, padx=(0,20), pady=(0, 10), sticky="ew")
 
     ip_label = ctk.CTkLabel(general_tab, text="IP Address:")
     ip_label.grid(row=7, column=0, padx=2, pady=2, sticky="w")
@@ -867,7 +1067,7 @@ def start_program(proc=0):
     ip_entry.grid(row=7, column=1, padx=2, pady=2, sticky="w")
     add_button = ctk.CTkButton(general_tab, text="Scan IP", command=scan_ip, 
                                 width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_button.grid(row=8, column=1, pady=(0, 10), sticky="w")
+    add_button.grid(row=8, column=1,padx=(0,20), pady=(0, 10), sticky="ew")
 
     hash_label = ctk.CTkLabel(general_tab, text="File Hash:")
     hash_label.grid(row=9, column=0, padx=2, pady=2, sticky="w")
@@ -875,7 +1075,7 @@ def start_program(proc=0):
     hash_entry.grid(row=9, column=1, padx=2, pady=2, sticky="w")
     add_button = ctk.CTkButton(general_tab, text="Scan Hash", command=scan_hash, 
                                 width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_button.grid(row=10, column=1, pady=(0, 10), sticky="w")
+    add_button.grid(row=10, column=1,padx=(0,20), pady=(0, 10), sticky="ew")
 
     # Outcome Label
     label = ctk.CTkLabel(general_tab, text="Outcome:", font=("Arial", 14, "bold"), fg_color="transparent", text_color="#ffffff")
@@ -890,9 +1090,10 @@ def start_program(proc=0):
     # Insert Button
     add_button = ctk.CTkButton(general_tab, text="Insert Outcome", command=insert_corresponding_value, 
                             width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_button.grid(row=13, column=1, pady=(0, 10), sticky="w")
+    add_button.grid(row=13, column=1,padx=(0,20), pady=(0, 10), sticky="ew")
 
 
+   
     # Email Tab
     email_tab = tab_control.add("Email")
     global emailSender, emailRecipient, emailSubject, emailAttachments
@@ -902,7 +1103,7 @@ def start_program(proc=0):
     emailSender = ctk.CTkEntry(email_tab, placeholder_text="Enter Email Sender", width=200)
     emailSender.grid(row=0, column=1, padx=2, pady=2, sticky="w")
     add_sender_button = ctk.CTkButton(email_tab,command=lambda: add_info("sender", emailSender), text="Add Info", width=20, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_sender_button.grid(row=1, column=1, padx=2, pady=(0, 10), sticky="w")
+    add_sender_button.grid(row=1, column=1, padx=(0,20), pady=(0, 10), sticky="ew")
 
     # Email Recipient
     email_recipient_label = ctk.CTkLabel(email_tab, text="Recipient:", font=("Verdana", 12), text_color="#ffffff")
@@ -910,7 +1111,7 @@ def start_program(proc=0):
     emailRecipient = ctk.CTkEntry(email_tab, placeholder_text="Enter Email Recipient", width=200)
     emailRecipient.grid(row=2, column=1, padx=2, pady=2, sticky="w")
     add_recipient_button = ctk.CTkButton(email_tab,command=lambda: add_info("recipient", emailRecipient), text="Add Info", width=20, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_recipient_button.grid(row=3, column=1, padx=2, pady=(0, 10), sticky="w")
+    add_recipient_button.grid(row=3, column=1,padx=(0,20), pady=(0, 10), sticky="ew")
 
     # Email Subject
     email_subject_label = ctk.CTkLabel(email_tab, text="Subject:", font=("Verdana", 12), text_color="#ffffff")
@@ -918,7 +1119,7 @@ def start_program(proc=0):
     emailSubject = ctk.CTkEntry(email_tab, placeholder_text="Enter Email Subject", width=200)
     emailSubject.grid(row=4, column=1, padx=2, pady=2, sticky="w")
     add_subject_button = ctk.CTkButton(email_tab, command=lambda: add_info("subject", emailSubject), text="Add Info", width=20, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_subject_button.grid(row=5, column=1, padx=2, pady=(5, 10), sticky="w")
+    add_subject_button.grid(row=5, column=1,padx=(0,20), pady=(5, 10), sticky="ew")
 
     # Email Attachments
     email_attachments_label = ctk.CTkLabel(email_tab, text="Attachments:", font=("Verdana", 12))
@@ -926,7 +1127,7 @@ def start_program(proc=0):
     emailAttachments = ctk.CTkEntry(email_tab,placeholder_text="Enter Email Attachments", width=200)
     emailAttachments.grid(row=6, column=1, padx=2, pady=2, sticky="w")
     add_attachments_button = ctk.CTkButton(email_tab, command=lambda: add_info("attachments", emailAttachments), text="Add Info", width=20, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_attachments_button.grid(row=7, column=1, padx=2, pady=(5, 10), sticky="w")
+    add_attachments_button.grid(row=7, column=1,padx=(0,20), pady=(5, 10), sticky="w")
 
     # Search Tab
     global search_entry, results_list
@@ -941,25 +1142,62 @@ def start_program(proc=0):
 
     # Search Button
     search_button = ctk.CTkButton(search_tab, text="Search", command=search_files, width=20, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    search_button.grid(row=2, column=0, padx=10, pady=10, sticky="w")
+    search_button.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
 
     # Results Listbox
     
     results_list = tk.Listbox(search_tab, width=40, height=15, bg="#2d2d44", fg="#ffffff", font=("Arial", 12), selectbackground="#4C9CD7", selectforeground="#ffffff")
-    results_list.grid(row=3, column=0, padx=10, pady=5)
+    results_list.grid(row=3, column=0, padx=10, pady=20)
     results_list.bind("<Double-1>", open_file)
 
-    # Example: Create a 2x2 grid for buttons at the bottom of the right frame
+
+    global rows, table_frame, canvas
+    rows = []
+
+    # Create canvas and scrollbar for scrollable area
+    canvas = tk.Canvas(search_tab, height=300, bg="#2d2d44",)
+    scrollbar = tk.Scrollbar(search_tab, orient="vertical", command=canvas.yview)
+    scrollbarX = tk.Scrollbar(search_tab, orient="horizontal", command=canvas.xview)
+    
+    scrollbar.config(background="#4D4D4D", relief="flat")
+    scrollbarX.config(background="#4D4D4D", relief="flat")
+
+    canvas.configure(yscrollcommand=scrollbar.set)
+    canvas.configure(xscrollcommand=scrollbarX.set, xscrollincrement=10)
+
+    table_frame = ctk.CTkFrame(canvas)
+    table_frame.grid(row=30, column=0, columnspan=10, pady=10, padx=10, sticky="w")
+    table_frame.grid_columnconfigure(2, weight=1, minsize=150, uniform="entry_width")
+
+    # Create the window inside the canvas for the table
+    canvas.create_window((0, 0), window=table_frame, anchor="nw")
+
+    # Grid canvas and scrollbar
+    canvas.grid(row=30, column=0, columnspan=3, pady=10, padx=1)
+    scrollbar.grid(row=30, column=2, sticky="nse")
+    scrollbarX.grid(row=30, column=0, columnspan=3, sticky="ewn")
+
+    # Table headers
+    headers = ["Entity", "Observed", "Note", "Action"]
+    for col, text in enumerate(headers):
+        label = ctk.CTkLabel(table_frame, text=text, font=("Arial", 14, "bold"))
+        label.grid(row=0, column=col, padx=20, pady=5, sticky="w")
+
+    table_frame.update_idletasks()
+    canvas.config(scrollregion=canvas.bbox("all"))
+
+     #Example: Create a 2x2 grid for buttons at the bottom of the right frame
     button_1 = ctk.CTkButton(general_tab, text="Save Case as", width=100, command=lambda: save_note(2), height=20, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
     button_2 = ctk.CTkButton(general_tab, text="Next Case", width=100, command=next_case, height=20, fg_color="#4CAF50", hover_color="#45A049", font=("Verdana", 12, "bold"))
     button_3 = ctk.CTkButton(general_tab, text="Copy All", width=100, command=copy_to_clipboard, height=20, fg_color="#FF9800", hover_color="#FF5722", font=("Verdana", 12, "bold"))
     button_4 = ctk.CTkButton(general_tab, text="Clear", width=100, command=clear_input, height=20, fg_color="#F44336", hover_color="#D32F2F", font=("Verdana", 12, "bold"))
 
     # Add buttons to a 2x2 grid layout at the bottom of the right frame
-    button_1.grid(row=22, column=0, padx=2, pady=2)  # Top-left button
-    button_2.grid(row=22, column=1, padx=2, pady=2)  # Top-right button
-    button_3.grid(row=21, column=0, padx=2, pady=2)  # Bottom-left button
-    button_4.grid(row=21, column=1, padx=2, pady=2)  # Bottom-right button
+    button_1.grid(row=22, column=0, padx=2, pady=2, sticky="ew")  # Top-left button
+    button_2.grid(row=22, column=1, padx=2, pady=2, sticky="ew")  # Top-right button
+    button_3.grid(row=21, column=1, padx=2, pady=2, sticky="ew")  # Bottom-left button
+    button_4.grid(row=21, column=0, padx=2, pady=2, sticky="ew")  # Bottom-right button
+
 
     for tab in [general_tab, email_tab, search_tab]:
         tab.grid_rowconfigure(0, weight=1)
@@ -978,6 +1216,7 @@ def start_program(proc=0):
 
 
 if __name__ == "__main__":
+    from core_functions.load_page import load_loading_screen
     global settings
     csv_file = "config.csv"
 
