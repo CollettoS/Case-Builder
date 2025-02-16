@@ -1,5 +1,5 @@
 name = "Escalation Builder"
-enabled = True
+enabled = False # Set so cannot be accessible through the SOC tools menu, this is to avoid any issues
 id = 102
 author = "Sam Collett"
 description = "Tool to help build escalations"
@@ -242,7 +242,6 @@ def run(ents=[], alert=""):
             insert_text(f"We are escalating this case to you as we have received an alert for {input_value}\n")
             
             user = get_user_ent()
-            print(user)
             if user:  # Check if 'type' is 'user'
                 input_box.insert(0, user)  # Insert the name if exists in the dictionary
             
@@ -286,11 +285,8 @@ def run(ents=[], alert=""):
 
         elif step == 8:
             remidiation = get_individual_selected_values()
-            print(remidiation)
             numb = int(len(remidiation))
-            print("num: ", numb)
             formatted_text = format_remidiation_text(numb, remidiation)
-            print(formatted_text)
             if formatted_text:
                 insert_text(f"If this activity is deemed malicious we reccomed {formatted_text}\n\n")
             

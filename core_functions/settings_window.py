@@ -10,7 +10,6 @@ def open_settings_menu(root, proc=0):
     if proc == 1:
         return
     if root is None or not isinstance(root, ctk.CTk):
-        print("Error: root is not a valid CTk instance!")
         return
     csv_file = 'config.csv'
     settings = read_settings(csv_file)
