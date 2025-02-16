@@ -26,16 +26,14 @@ def open_settings_menu(root, proc=0):
     
     general_tab = notebook.add("General")
     appearance_tab = notebook.add("Appearance")
+    escalations_tab = notebook.add("Escalations")
+
     advanced_tab = notebook.add("Advanced")
     
     # General Tab
     version = compare_versions(2)
     ctk.CTkLabel(general_tab, text=f"Case Builder: {version}", font=("Arial", 14)).pack(anchor="w", pady=5)
-    
     spell_check_value = ctk.BooleanVar(value=settings.get("spell_check") == "True")
-    timer_value = ctk.BooleanVar(value=settings.get("enable_timer") == "True")
-    email_tab_value = ctk.BooleanVar(value=settings.get("enable_email_tab") == "True")
-    
     ctk.CTkCheckBox(general_tab, text="Spell Checker", variable=spell_check_value).pack(anchor="w")
 
     # Appearance Tab
@@ -49,6 +47,18 @@ def open_settings_menu(root, proc=0):
     font_size_spinbox = ctk.CTkEntry(appearance_tab, textvariable=font_size_var, width=50)
     font_size_spinbox.pack(anchor="w", pady=5)
     
+
+    # Escalations Tab
+    sign_var = ctk.StringVar(value=str(settings.get("esc_sign")))
+    sign_var_name = ctk.StringVar(value=str(settings.get("esc_sign_name")))
+
+    ctk.CTkLabel(escalations_tab, text="Escalation Signature Text:").pack(anchor="w")
+    ctk.CTkEntry(escalations_tab, textvariable=sign_var, width=300).pack(anchor="w", pady=5)
+
+    ctk.CTkLabel(escalations_tab, text="Escalation Signature Name:").pack(anchor="w")
+    ctk.CTkEntry(escalations_tab, textvariable=sign_var_name, width=300).pack(anchor="w", pady=5)
+
+
     # Advanced Tab
     api1_var = ctk.StringVar(value=str(settings.get("abuseipdb_api")))
     api2_var = ctk.StringVar(value=str(settings.get("vt_api")))
@@ -67,13 +77,12 @@ def open_settings_menu(root, proc=0):
     button_frame = ctk.CTkFrame(settings_window)
     button_frame.pack(side="bottom", fill="x", pady=10)
     
-    ctk.CTkButton(button_frame, text="Save", command=lambda: save_settings(spell_check_value, debug_var, font_size_var, api1_var, api2_var)).pack(side="right", padx=5)
+    ctk.CTkButton(button_frame, text="Save", command=lambda: save_settings(spell_check_value, debug_var, font_size_var, api1_var, api2_var, sign_var, sign_var_name)).pack(side="right", padx=5)
     ctk.CTkButton(button_frame, text="Close", command=settings_window.destroy).pack(side="right", padx=5)
     
     settings_window.mainloop()
 
-
-def save_settings(spell_check_var, debug_var, font_size_var, api1, api2):
+def save_settings(spell_check_var, debug_var, font_size_var, api1, api2, sign_var, sign_var_name):
 
     csv_file = 'config.csv'
     settings = read_settings(csv_file)
@@ -85,6 +94,8 @@ def save_settings(spell_check_var, debug_var, font_size_var, api1, api2):
     font_size = font_size_var.get()
     api1 = api1.get()
     api2 = api2.get()
+    sign_var = sign_var.get()
+    sign_var_name = sign_var_name.get()
     # Print the settings to verify 
 
     # Update the settings dictionary and write to CSV
@@ -93,6 +104,8 @@ def save_settings(spell_check_var, debug_var, font_size_var, api1, api2):
     settings["font_size"] = str(font_size)
     settings["abuseipdb_api"] = str(api1)
     settings["vt_api"] = str(api2)
+    settings["esc_sign"] = str(sign_var)
+    settings["esc_sign_name"] = str(sign_var_name)
 
     # Save updated settings to the CSV
     new_font = int(font_size)
@@ -115,7 +128,6 @@ def write_settings(csv_file, settings):
         return True
     except:
         return False
-
 
 def check_font_size_and_notify(previous_font_size, new_font_size):
 

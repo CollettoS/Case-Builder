@@ -2,8 +2,10 @@ setting_name,setting_value
 spell_check,False
 debug_mode,False
 theme,Dark
-version,1.0.2
+version,1.0.3
 msg,None
 font_size,12
+esc_sign,Kind regards
+esc_sign_name,SOC
 abuseipdb_api,xxx
 vt_api,xxx

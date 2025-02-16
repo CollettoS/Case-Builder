@@ -13,17 +13,19 @@ import      random
 from        core_functions.miscFuncs import get_country_name
 from        core_functions.version_control import compare_versions
 from        core_functions.case_entities import entitity_manager_window
+import plugins.escalation_builder
 from        settings.debug import write_debug as log_debug_action
 from        core_functions.settings_window import open_settings_menu
 import      importlib.util
 from        spellchecker    import      SpellChecker
 import      core_functions.miscFuncs
+import      plugins
 
 FOLDER_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'saved_notes')
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 spell = SpellChecker()
-case_entities_list = {}
+case_entities_list = []
 root = None
 # Debugging ->
 # Templates:
@@ -254,6 +256,11 @@ def add_user():
     if role:
         user_text += f"\nRole:\t\t\t{role}"
         log_debug_action(f"Role - {role}")
+
+        case_entities_list.append({'type': 'Role', 'ent': role})
+
+
+        print(case_entities_list)
         if user:
             line = 1
         else: 
@@ -773,12 +780,9 @@ def add_row(ent_type, value1="Static 1", value2="Static 2", editable_value=""):
     global table_frame, canvas
     row_index = len(rows) + 1  # New row index
 
-    
+    case_entities_list.append({'type': ent_type, 'ent': value1})
 
-    case_entities_list.update({
-    "type": ent_type,
-    "ent": value1
-    })
+    print(case_entities_list)
 
     label0 = ctk.CTkLabel(table_frame, text=ent_type)
     label0.grid(row=row_index, column=0, padx=10, pady=5)
@@ -928,8 +932,9 @@ def update_note_in_csv(entity, new_note):
     except Exception as e:
         log_debug_action(f"An error occurred while updating the CSV file: {e}")
 
-
-
+def get_alert_name():
+    case_name = title_entry.get().strip()
+    return case_name
 
 def start_program(proc=0):
     global status_label, menu_bar, note_area, title_entry, tab_control, top_frame, cases_menu
@@ -937,310 +942,312 @@ def start_program(proc=0):
     global note_font
     global dropdown_values, dropdown, corresponding_values
 
-    root = ctk.CTk()
-    log_debug_action(f"Start Program Function has started to build the GUI")
-
-    root.title("Case Note Builder - Tool")
-    root.geometry("800x600")
-    root.update_idletasks()
-    root.configure(bg="#1e1e2f")
-    settings = read_settings("config.csv")
-    initial_font_size = int(settings.get("font_size"))
-    bold_font = font.Font(family="Verdana", weight="bold", size=10)
-    note_font = ctk.CTkFont(family='Verdana', size=initial_font_size)
-
-    # Create the top menu bar using standard Tkinter Menu
-    menu_bar = tk.Menu(root)
-    root.config(menu=menu_bar)
-
-    # File Menu
-    file_menu = tk.Menu(menu_bar)
-    menu_bar.add_cascade(label="File", menu=file_menu)
-    #file_menu.add_command(label="New", command=lambda: print("New File"))
-    #file_menu.add_command(label="Open", command=lambda: print("Open File"))
-    file_menu.add_separator()
-    file_menu.add_command(label="Exit", command=root.quit)
-    
-    # Options Menu
-    cases_menu = tk.Menu(menu_bar)
-    menu_bar.add_cascade(label="My Cases", menu=cases_menu)
-
-    # My Cases Menu
-    options_menu = tk.Menu(menu_bar)
-    menu_bar.add_cascade(label="Options", menu=options_menu)
-    options_menu.add_command(label="Settings", command=lambda: open_settings_menu(root))
-
-    # SOC Tools Menu
-    soc_tools_menu = tk.Menu(menu_bar)
-    menu_bar.add_cascade(label="SOC Tools", menu=soc_tools_menu)
-    load_plugins(soc_tools_menu)
-
-    entities_menu = tk.Menu(menu_bar)
-    menu_bar.add_cascade(label="Case Entities", menu=entities_menu)
-    entities_menu.add_command(label="Add Entitiy", command=entitity_manager_window)
-
-
-    from core_functions.about import open_about_window
-    help_menu = tk.Menu(menu_bar)
-    menu_bar.add_cascade(label="Help", menu=help_menu)
-    help_menu.add_command(label="About", command=open_about_window)
-    help_menu.add_command(label="Bug Report", command=core_functions.miscFuncs.bug_report)
-    help_menu.add_command(label="Github", command=core_functions.miscFuncs.open_github)
-    help_menu.add_command(label="Help Docs", command=core_functions.miscFuncs.open_help)
-    help_menu.add_command(label="Message the Devs", command=core_functions.miscFuncs.msg_dev)
-    help_menu.add_command(label="Submit Idea", command=core_functions.miscFuncs.submit_idea)
-
-
-    # Frame for the status and timer
-    top_frame = ctk.CTkFrame(root, fg_color="#333333")
-    top_frame.pack(fill=tk.X)
-    
-    # Status label
-    status_label = ctk.CTkLabel(top_frame, text="Welcome!", font=("Helvetica", 10, "bold"), anchor="w")
-    status_label.pack(side=tk.LEFT, fill=tk.X, padx=22, pady=2)  # Fill horizontally, with padding
-
-    # Configure grid weight to ensure proper resizing
-    root.grid_rowconfigure(0, weight=1)  # Make row 0 expand vertically
-    root.grid_columnconfigure(0, weight=1)  # Ensure column expands horizontally if needed
-
-
-    # Create a container frame to hold both the left and right frames (70/30 split)
-    container_frame = ctk.CTkFrame(root)
-    container_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
-
-    # Left pane (Note area)
-    left_frame = ctk.CTkFrame(container_frame, fg_color="#2d2d44")
-    left_frame.grid(row=0, rowspan=100, column=0, sticky="nsew", padx=2, pady=2)
-
-    # Title entry field at the top of the note area
-    title_entry = ctk.CTkEntry(left_frame, placeholder_text="Enter case title", font=("Verdana", 12), width=200)
-    title_entry.pack(padx=5, pady=5, fill=tk.X)
-
-    # Create a frame to hold the textbox and scrollbar
-    text_frame = ctk.CTkFrame(left_frame, fg_color="#1e1e2f")
-    text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-    # Add a Textbox
-    note_area = ctk.CTkTextbox(text_frame, height=750, wrap=tk.WORD, fg_color="#2d2d44", text_color="#ffffff", font=note_font)
-    note_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-
-    # Right pane (Input fields and tabs)
-    right_frame = ctk.CTkFrame(container_frame, width=100, fg_color="#1e1e2f")
-    right_frame.grid(row=0, column=1, sticky="nsew", padx=2, pady=2)
-    right_frame.grid_propagate(False)
     
 
 
 
-    container_frame.grid_columnconfigure(0, weight=50)  # Left pane takes 70%
-    container_frame.grid_columnconfigure(1, weight=2, minsize=100)  # Right pane takes 30%
 
-    # Tab control for the right pane
-    tab_control = ctk.CTkTabview(right_frame)
-    tab_control.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-    global user_entry, role_entry, email_entry, topvalue, host_entry, ip_entry, hash_entry
-    # General Tab
-    general_tab = tab_control.add("General")
-    user_label = ctk.CTkLabel(general_tab, text="User:")
-    user_label.grid(row=0, column=0, padx=2, pady=2, sticky="w")
-    user_entry = ctk.CTkEntry(general_tab, placeholder_text="Enter user", width=200)
-    user_entry.grid(row=0, column=1, padx=2, pady=2, sticky="w")
+#if __name__ == "__main__":
+csv_file = "config.csv"
 
-    role_label = ctk.CTkLabel(general_tab, text="Role:")
-    role_label.grid(row=1, column=0, padx=2, pady=2, sticky="w")
-    role_entry = ctk.CTkEntry(general_tab, placeholder_text="Enter role", width=200)
-    role_entry.grid(row=1, column=1, padx=2, pady=2, sticky="w")
+settings = read_settings(csv_file)
+log_debug_action("- - - - - - - - - - - - - - - - - - - -")
+log_debug_action("Program Started")
+log_debug_action(f"Config file set as {csv_file}")
+root = ctk.CTk()
+log_debug_action(f"Start Program Function has started to build the GUI")
 
-    email_label = ctk.CTkLabel(general_tab, text="Email:")
-    email_label.grid(row=2, column=0, padx=2, pady=2, sticky="w")
-    email_entry = ctk.CTkEntry(general_tab, placeholder_text="Enter email", width=200)
-    email_entry.grid(row=2, column=1, padx=2, pady=2, sticky="w")
+root.title("Case Note Builder - Tool")
+root.geometry("800x600")
+root.update_idletasks()
+root.configure(bg="#1e1e2f")
+settings = read_settings("config.csv")
+initial_font_size = int(settings.get("font_size"))
+bold_font = font.Font(family="Verdana", weight="bold", size=10)
+note_font = ctk.CTkFont(family='Verdana', size=initial_font_size)
 
-    checkbox_var = ctk.BooleanVar(value=True)  # Set to True to make it checked by default
-    tick_label = ctk.CTkLabel(general_tab, text="Add to top:")
-    tick_label.grid(row=3, column=0, padx=2, pady=2, sticky="w")
-    topvalue = ctk.CTkCheckBox(general_tab, text="", onvalue=True, offvalue=False, variable=checkbox_var)
-    topvalue.grid(row=3, column=1, pady=2, sticky="w")
-    add_button = ctk.CTkButton(general_tab, text="Add User", command=add_user, 
-                                width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_button.grid(row=4, column=1,padx=(0,20), pady=(0, 10), sticky="ew")
+# Create the top menu bar using standard Tkinter Menu
+menu_bar = tk.Menu(root)
+root.config(menu=menu_bar)
 
-    host_label = ctk.CTkLabel(general_tab, text="Host:")
-    host_label.grid(row=5, column=0, padx=2, pady=2, sticky="w")
-    host_entry = ctk.CTkEntry(general_tab, placeholder_text="Enter host", width=200)
-    host_entry.grid(row=5, column=1, padx=2, pady=2, sticky="w")
-    add_button = ctk.CTkButton(general_tab, text="Add Host", command=add_host, 
-                                width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_button.grid(row=6, column=1, padx=(0,20), pady=(0, 10), sticky="ew")
+# File Menu
+file_menu = tk.Menu(menu_bar)
+menu_bar.add_cascade(label="File", menu=file_menu)
+#file_menu.add_command(label="New", command=lambda: print("New File"))
+#file_menu.add_command(label="Open", command=lambda: print("Open File"))
+file_menu.add_separator()
+file_menu.add_command(label="Exit", command=root.quit)
 
-    ip_label = ctk.CTkLabel(general_tab, text="IP Address:")
-    ip_label.grid(row=7, column=0, padx=2, pady=2, sticky="w")
-    ip_entry = ctk.CTkEntry(general_tab, placeholder_text="Enter IP address", width=200)
-    ip_entry.grid(row=7, column=1, padx=2, pady=2, sticky="w")
-    add_button = ctk.CTkButton(general_tab, text="Scan IP", command=scan_ip, 
-                                width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_button.grid(row=8, column=1,padx=(0,20), pady=(0, 10), sticky="ew")
+# Options Menu
+cases_menu = tk.Menu(menu_bar)
+menu_bar.add_cascade(label="My Cases", menu=cases_menu)
 
-    hash_label = ctk.CTkLabel(general_tab, text="File Hash:")
-    hash_label.grid(row=9, column=0, padx=2, pady=2, sticky="w")
-    hash_entry = ctk.CTkEntry(general_tab, placeholder_text="Enter File Hash", width=200)
-    hash_entry.grid(row=9, column=1, padx=2, pady=2, sticky="w")
-    add_button = ctk.CTkButton(general_tab, text="Scan Hash", command=scan_hash, 
-                                width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_button.grid(row=10, column=1,padx=(0,20), pady=(0, 10), sticky="ew")
+# My Cases Menu
+options_menu = tk.Menu(menu_bar)
+menu_bar.add_cascade(label="Options", menu=options_menu)
+options_menu.add_command(label="Settings", command=lambda: open_settings_menu(root))
 
-    # Outcome Label
-    label = ctk.CTkLabel(general_tab, text="Outcome:", font=("Arial", 14, "bold"), fg_color="transparent", text_color="#ffffff")
-    label.grid(row=12, column=0, padx=10, pady=5, sticky="w")
+# SOC Tools Menu
+soc_tools_menu = tk.Menu(menu_bar)
+menu_bar.add_cascade(label="SOC Tools", menu=soc_tools_menu)
+load_plugins(soc_tools_menu)
 
-    # Dropdown (Combobox)
-    dropdown_values, corresponding_values = load_csv_data()
+entities_menu = tk.Menu(menu_bar)
+menu_bar.add_cascade(label="Case Entities", menu=entities_menu)
+entities_menu.add_command(label="Add Entitiy", command=entitity_manager_window)
 
-    dropdown = ctk.CTkComboBox(general_tab, values=dropdown_values, width=200)
-    dropdown.grid(row=12, column=1, padx=10, pady=5, sticky="w")
 
-    # Insert Button
-    add_button = ctk.CTkButton(general_tab, text="Insert Outcome", command=insert_corresponding_value, 
+from core_functions.about import open_about_window
+help_menu = tk.Menu(menu_bar)
+menu_bar.add_cascade(label="Help", menu=help_menu)
+help_menu.add_command(label="About", command=open_about_window)
+help_menu.add_command(label="Bug Report", command=core_functions.miscFuncs.bug_report)
+help_menu.add_command(label="Github", command=core_functions.miscFuncs.open_github)
+help_menu.add_command(label="Help Docs", command=core_functions.miscFuncs.open_help)
+help_menu.add_command(label="Message the Devs", command=core_functions.miscFuncs.msg_dev)
+help_menu.add_command(label="Submit Idea", command=core_functions.miscFuncs.submit_idea)
+
+
+# Frame for the status and timer
+top_frame = ctk.CTkFrame(root, fg_color="#333333")
+top_frame.pack(fill=tk.X)
+
+# Status label
+status_label = ctk.CTkLabel(top_frame, text="Welcome!", font=("Helvetica", 10, "bold"), anchor="w")
+status_label.pack(side=tk.LEFT, fill=tk.X, padx=22, pady=2)  # Fill horizontally, with padding
+
+# Configure grid weight to ensure proper resizing
+root.grid_rowconfigure(0, weight=1)  # Make row 0 expand vertically
+root.grid_columnconfigure(0, weight=1)  # Ensure column expands horizontally if needed
+
+
+# Create a container frame to hold both the left and right frames (70/30 split)
+container_frame = ctk.CTkFrame(root)
+container_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+
+# Left pane (Note area)
+left_frame = ctk.CTkFrame(container_frame, fg_color="#2d2d44")
+left_frame.grid(row=0, rowspan=100, column=0, sticky="nsew", padx=2, pady=2)
+
+# Title entry field at the top of the note area
+title_entry = ctk.CTkEntry(left_frame, placeholder_text="Enter case title", font=("Verdana", 12), width=200)
+title_entry.pack(padx=5, pady=5, fill=tk.X)
+
+# Create a frame to hold the textbox and scrollbar
+text_frame = ctk.CTkFrame(left_frame, fg_color="#1e1e2f")
+text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+# Add a Textbox
+note_area = ctk.CTkTextbox(text_frame, height=750, wrap=tk.WORD, fg_color="#2d2d44", text_color="#ffffff", font=note_font)
+note_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+
+# Right pane (Input fields and tabs)
+right_frame = ctk.CTkFrame(container_frame, width=100, fg_color="#1e1e2f")
+right_frame.grid(row=0, column=1, sticky="nsew", padx=2, pady=2)
+right_frame.grid_propagate(False)
+
+
+
+
+container_frame.grid_columnconfigure(0, weight=50)  # Left pane takes 70%
+container_frame.grid_columnconfigure(1, weight=2, minsize=100)  # Right pane takes 30%
+
+# Tab control for the right pane
+tab_control = ctk.CTkTabview(right_frame)
+tab_control.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+global user_entry, role_entry, email_entry, topvalue, host_entry, ip_entry, hash_entry
+# General Tab
+general_tab = tab_control.add("General")
+user_label = ctk.CTkLabel(general_tab, text="User:")
+user_label.grid(row=0, column=0, padx=2, pady=2, sticky="w")
+user_entry = ctk.CTkEntry(general_tab, placeholder_text="Enter user", width=200)
+user_entry.grid(row=0, column=1, padx=2, pady=2, sticky="w")
+
+role_label = ctk.CTkLabel(general_tab, text="Role:")
+role_label.grid(row=1, column=0, padx=2, pady=2, sticky="w")
+role_entry = ctk.CTkEntry(general_tab, placeholder_text="Enter role", width=200)
+role_entry.grid(row=1, column=1, padx=2, pady=2, sticky="w")
+
+email_label = ctk.CTkLabel(general_tab, text="Email:")
+email_label.grid(row=2, column=0, padx=2, pady=2, sticky="w")
+email_entry = ctk.CTkEntry(general_tab, placeholder_text="Enter email", width=200)
+email_entry.grid(row=2, column=1, padx=2, pady=2, sticky="w")
+
+checkbox_var = ctk.BooleanVar(value=True)  # Set to True to make it checked by default
+tick_label = ctk.CTkLabel(general_tab, text="Add to top:")
+tick_label.grid(row=3, column=0, padx=2, pady=2, sticky="w")
+topvalue = ctk.CTkCheckBox(general_tab, text="", onvalue=True, offvalue=False, variable=checkbox_var)
+topvalue.grid(row=3, column=1, pady=2, sticky="w")
+add_button = ctk.CTkButton(general_tab, text="Add User", command=add_user, 
                             width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_button.grid(row=13, column=1,padx=(0,20), pady=(0, 10), sticky="ew")
+add_button.grid(row=4, column=1,padx=(0,20), pady=(0, 10), sticky="ew")
 
+host_label = ctk.CTkLabel(general_tab, text="Host:")
+host_label.grid(row=5, column=0, padx=2, pady=2, sticky="w")
+host_entry = ctk.CTkEntry(general_tab, placeholder_text="Enter host", width=200)
+host_entry.grid(row=5, column=1, padx=2, pady=2, sticky="w")
+add_button = ctk.CTkButton(general_tab, text="Add Host", command=add_host, 
+                            width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
+add_button.grid(row=6, column=1, padx=(0,20), pady=(0, 10), sticky="ew")
 
-   
-    # Email Tab
-    email_tab = tab_control.add("Email")
-    global emailSender, emailRecipient, emailSubject, emailAttachments
-    # Email Sender
-    email_sender_label = ctk.CTkLabel(email_tab, text="Sender:", font=("Verdana", 12), text_color="#ffffff")
-    email_sender_label.grid(row=0, column=0, padx=2, pady=2, sticky="w")
-    emailSender = ctk.CTkEntry(email_tab, placeholder_text="Enter Email Sender", width=200)
-    emailSender.grid(row=0, column=1, padx=2, pady=2, sticky="w")
-    add_sender_button = ctk.CTkButton(email_tab,command=lambda: add_info("sender", emailSender), text="Add Info", width=20, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_sender_button.grid(row=1, column=1, padx=(0,20), pady=(0, 10), sticky="ew")
+ip_label = ctk.CTkLabel(general_tab, text="IP Address:")
+ip_label.grid(row=7, column=0, padx=2, pady=2, sticky="w")
+ip_entry = ctk.CTkEntry(general_tab, placeholder_text="Enter IP address", width=200)
+ip_entry.grid(row=7, column=1, padx=2, pady=2, sticky="w")
+add_button = ctk.CTkButton(general_tab, text="Scan IP", command=scan_ip, 
+                            width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
+add_button.grid(row=8, column=1,padx=(0,20), pady=(0, 10), sticky="ew")
 
-    # Email Recipient
-    email_recipient_label = ctk.CTkLabel(email_tab, text="Recipient:", font=("Verdana", 12), text_color="#ffffff")
-    email_recipient_label.grid(row=2, column=0, padx=2, pady=2, sticky="w")
-    emailRecipient = ctk.CTkEntry(email_tab, placeholder_text="Enter Email Recipient", width=200)
-    emailRecipient.grid(row=2, column=1, padx=2, pady=2, sticky="w")
-    add_recipient_button = ctk.CTkButton(email_tab,command=lambda: add_info("recipient", emailRecipient), text="Add Info", width=20, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_recipient_button.grid(row=3, column=1,padx=(0,20), pady=(0, 10), sticky="ew")
+hash_label = ctk.CTkLabel(general_tab, text="File Hash:")
+hash_label.grid(row=9, column=0, padx=2, pady=2, sticky="w")
+hash_entry = ctk.CTkEntry(general_tab, placeholder_text="Enter File Hash", width=200)
+hash_entry.grid(row=9, column=1, padx=2, pady=2, sticky="w")
+add_button = ctk.CTkButton(general_tab, text="Scan Hash", command=scan_hash, 
+                            width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
+add_button.grid(row=10, column=1,padx=(0,20), pady=(0, 10), sticky="ew")
 
-    # Email Subject
-    email_subject_label = ctk.CTkLabel(email_tab, text="Subject:", font=("Verdana", 12), text_color="#ffffff")
-    email_subject_label.grid(row=4, column=0, padx=2, pady=2, sticky="w")
-    emailSubject = ctk.CTkEntry(email_tab, placeholder_text="Enter Email Subject", width=200)
-    emailSubject.grid(row=4, column=1, padx=2, pady=2, sticky="w")
-    add_subject_button = ctk.CTkButton(email_tab, command=lambda: add_info("subject", emailSubject), text="Add Info", width=20, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_subject_button.grid(row=5, column=1,padx=(0,20), pady=(5, 10), sticky="ew")
+# Outcome Label
+label = ctk.CTkLabel(general_tab, text="Outcome:", font=("Arial", 14, "bold"), fg_color="transparent", text_color="#ffffff")
+label.grid(row=12, column=0, padx=10, pady=5, sticky="w")
 
-    # Email Attachments
-    email_attachments_label = ctk.CTkLabel(email_tab, text="Attachments:", font=("Verdana", 12))
-    email_attachments_label.grid(row=6, column=0, padx=2, pady=2, sticky="w")
-    emailAttachments = ctk.CTkEntry(email_tab,placeholder_text="Enter Email Attachments", width=200)
-    emailAttachments.grid(row=6, column=1, padx=2, pady=2, sticky="w")
-    add_attachments_button = ctk.CTkButton(email_tab, command=lambda: add_info("attachments", emailAttachments), text="Add Info", width=20, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    add_attachments_button.grid(row=7, column=1,padx=(0,20), pady=(5, 10), sticky="w")
+# Dropdown (Combobox)
+dropdown_values, corresponding_values = load_csv_data()
 
-    # Search Tab
-    global search_entry, results_list
-    search_tab = tab_control.add("Search")
-    search_label = ctk.CTkLabel(search_tab, text="Enter search term:", font=("Verdana", 12, "bold"), text_color="#ffffff")
-    search_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
+dropdown = ctk.CTkComboBox(general_tab, values=dropdown_values, width=200)
+dropdown.grid(row=12, column=1, padx=10, pady=5, sticky="w")
 
-    # Search Entry
-    search_entry = ctk.CTkEntry(search_tab, width=250)
-    search_entry.grid(row=1, column=0, padx=10, pady=5, sticky="w")
-    search_entry.bind("<Return>", search_files)
-
-    # Search Button
-    search_button = ctk.CTkButton(search_tab, text="Search", command=search_files, width=20, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    search_button.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
-
-    # Results Listbox
-    
-    results_list = tk.Listbox(search_tab, width=40, height=15, bg="#2d2d44", fg="#ffffff", font=("Arial", 12), selectbackground="#4C9CD7", selectforeground="#ffffff")
-    results_list.grid(row=3, column=0, padx=10, pady=20)
-    results_list.bind("<Double-1>", open_file)
-
-
-    global rows, table_frame, canvas
-    rows = []
-
-    # Create canvas and scrollbar for scrollable area
-    canvas = tk.Canvas(search_tab, height=300, bg="#2d2d44",)
-    scrollbar = tk.Scrollbar(search_tab, orient="vertical", command=canvas.yview)
-    scrollbarX = tk.Scrollbar(search_tab, orient="horizontal", command=canvas.xview)
-    
-    scrollbar.config(background="#4D4D4D", relief="flat")
-    scrollbarX.config(background="#4D4D4D", relief="flat")
-
-    canvas.configure(yscrollcommand=scrollbar.set)
-    canvas.configure(xscrollcommand=scrollbarX.set, xscrollincrement=10)
-
-    table_frame = ctk.CTkFrame(canvas)
-    table_frame.grid(row=30, column=0, columnspan=10, pady=10, padx=10, sticky="w")
-    table_frame.grid_columnconfigure(2, weight=1, minsize=150, uniform="entry_width")
-
-    # Create the window inside the canvas for the table
-    canvas.create_window((0, 0), window=table_frame, anchor="nw")
-
-    # Grid canvas and scrollbar
-    canvas.grid(row=30, column=0, columnspan=3, pady=10, padx=1)
-    scrollbar.grid(row=30, column=2, sticky="nse")
-    scrollbarX.grid(row=30, column=0, columnspan=3, sticky="ewn")
-
-    # Table headers
-    headers = ["Type","Entity", "Observed", "Note", "Action"]
-    for col, text in enumerate(headers):
-        label = ctk.CTkLabel(table_frame, text=text, font=("Arial", 14, "bold"))
-        label.grid(row=0, column=col, padx=20, pady=5, sticky="w")
-
-    table_frame.update_idletasks()
-    canvas.config(scrollregion=canvas.bbox("all"))
-
-     #Example: Create a 2x2 grid for buttons at the bottom of the right frame
-    button_1 = ctk.CTkButton(general_tab, text="Save Case as", width=100, command=lambda: save_note(2), height=20, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
-    button_2 = ctk.CTkButton(general_tab, text="Next Case", width=100, command=next_case, height=20, fg_color="#4CAF50", hover_color="#45A049", font=("Verdana", 12, "bold"))
-    button_3 = ctk.CTkButton(general_tab, text="Copy All", width=100, command=copy_to_clipboard, height=20, fg_color="#166534", hover_color="#22c55e", font=("Verdana", 12, "bold"))
-    button_4 = ctk.CTkButton(general_tab, text="Clear", width=100, command=clear_input, height=20, fg_color="#F44336", hover_color="#D32F2F", font=("Verdana", 12, "bold"))
-
-    button_url = ctk.CTkButton(general_tab, text="Sanatize URLs", width=100, command=lambda: core_functions.miscFuncs.sanitize_urls(note_area), height=20, fg_color="#d97706", hover_color="#f59e0b", font=("Verdana", 12, "bold"))
-    button_url.grid(row=20, column=0, padx=2, pady=2, sticky="ew")  # Top-left button
-
-    # Add buttons to a 2x2 grid layout at the bottom of the right frame
-    button_1.grid(row=22, column=0, padx=2, pady=2, sticky="ew")  # Top-left button
-    button_2.grid(row=22, column=1, padx=2, pady=2, sticky="ew")  # Top-right button
-    button_3.grid(row=21, column=1, padx=2, pady=2, sticky="ew")  # Bottom-left button
-    button_4.grid(row=21, column=0, padx=2, pady=2, sticky="ew")  # Bottom-right button
-
-
-    for tab in [general_tab, email_tab, search_tab]:
-        tab.grid_rowconfigure(0, weight=1)
-        tab.grid_columnconfigure(0, weight=1)
-    log_debug_action(f"GUI loaded")
-
-
-    compare_versions(1)
-    populate_cases_menu()
-    root.after(3000, check_spelling)
-
-    update_status_message("All Modules Loaded!")
-    root.mainloop()
+# Insert Button
+add_button = ctk.CTkButton(general_tab, text="Insert Outcome", command=insert_corresponding_value, 
+                        width=40, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
+add_button.grid(row=13, column=1,padx=(0,20), pady=(0, 10), sticky="ew")
 
 
 
+# Email Tab
+email_tab = tab_control.add("Email")
+global emailSender, emailRecipient, emailSubject, emailAttachments
+# Email Sender
+email_sender_label = ctk.CTkLabel(email_tab, text="Sender:", font=("Verdana", 12), text_color="#ffffff")
+email_sender_label.grid(row=0, column=0, padx=2, pady=2, sticky="w")
+emailSender = ctk.CTkEntry(email_tab, placeholder_text="Enter Email Sender", width=200)
+emailSender.grid(row=0, column=1, padx=2, pady=2, sticky="w")
+add_sender_button = ctk.CTkButton(email_tab,command=lambda: add_info("sender", emailSender), text="Add Info", width=20, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
+add_sender_button.grid(row=1, column=1, padx=(0,20), pady=(0, 10), sticky="ew")
 
-if __name__ == "__main__":
-    global settings
-    csv_file = "config.csv"
+# Email Recipient
+email_recipient_label = ctk.CTkLabel(email_tab, text="Recipient:", font=("Verdana", 12), text_color="#ffffff")
+email_recipient_label.grid(row=2, column=0, padx=2, pady=2, sticky="w")
+emailRecipient = ctk.CTkEntry(email_tab, placeholder_text="Enter Email Recipient", width=200)
+emailRecipient.grid(row=2, column=1, padx=2, pady=2, sticky="w")
+add_recipient_button = ctk.CTkButton(email_tab,command=lambda: add_info("recipient", emailRecipient), text="Add Info", width=20, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
+add_recipient_button.grid(row=3, column=1,padx=(0,20), pady=(0, 10), sticky="ew")
 
-    settings = read_settings(csv_file)
-    log_debug_action("- - - - - - - - - - - - - - - - - - - -")
-    log_debug_action("Program Started")
-    log_debug_action(f"Config file set as {csv_file}")
+# Email Subject
+email_subject_label = ctk.CTkLabel(email_tab, text="Subject:", font=("Verdana", 12), text_color="#ffffff")
+email_subject_label.grid(row=4, column=0, padx=2, pady=2, sticky="w")
+emailSubject = ctk.CTkEntry(email_tab, placeholder_text="Enter Email Subject", width=200)
+emailSubject.grid(row=4, column=1, padx=2, pady=2, sticky="w")
+add_subject_button = ctk.CTkButton(email_tab, command=lambda: add_info("subject", emailSubject), text="Add Info", width=20, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
+add_subject_button.grid(row=5, column=1,padx=(0,20), pady=(5, 10), sticky="ew")
 
-    start_program()
+# Email Attachments
+email_attachments_label = ctk.CTkLabel(email_tab, text="Attachments:", font=("Verdana", 12))
+email_attachments_label.grid(row=6, column=0, padx=2, pady=2, sticky="w")
+emailAttachments = ctk.CTkEntry(email_tab,placeholder_text="Enter Email Attachments", width=200)
+emailAttachments.grid(row=6, column=1, padx=2, pady=2, sticky="w")
+add_attachments_button = ctk.CTkButton(email_tab, command=lambda: add_info("attachments", emailAttachments), text="Add Info", width=20, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
+add_attachments_button.grid(row=7, column=1,padx=(0,20), pady=(5, 10), sticky="w")
+
+# Search Tab
+global search_entry, results_list
+search_tab = tab_control.add("Search")
+search_label = ctk.CTkLabel(search_tab, text="Enter search term:", font=("Verdana", 12, "bold"), text_color="#ffffff")
+search_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
+
+# Search Entry
+search_entry = ctk.CTkEntry(search_tab, width=250)
+search_entry.grid(row=1, column=0, padx=10, pady=5, sticky="w")
+search_entry.bind("<Return>", search_files)
+
+# Search Button
+search_button = ctk.CTkButton(search_tab, text="Search", command=search_files, width=20, height=15, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
+search_button.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
+
+# Results Listbox
+
+results_list = tk.Listbox(search_tab, width=40, height=15, bg="#2d2d44", fg="#ffffff", font=("Arial", 12), selectbackground="#4C9CD7", selectforeground="#ffffff")
+results_list.grid(row=3, column=0, padx=10, pady=20)
+results_list.bind("<Double-1>", open_file)
+
+
+global rows, table_frame, canvas
+rows = []
+
+# Create canvas and scrollbar for scrollable area
+canvas = tk.Canvas(search_tab, height=300, bg="#2d2d44",)
+scrollbar = tk.Scrollbar(search_tab, orient="vertical", command=canvas.yview)
+scrollbarX = tk.Scrollbar(search_tab, orient="horizontal", command=canvas.xview)
+
+scrollbar.config(background="#4D4D4D", relief="flat")
+scrollbarX.config(background="#4D4D4D", relief="flat")
+
+canvas.configure(yscrollcommand=scrollbar.set)
+canvas.configure(xscrollcommand=scrollbarX.set, xscrollincrement=10)
+
+table_frame = ctk.CTkFrame(canvas)
+table_frame.grid(row=30, column=0, columnspan=10, pady=10, padx=10, sticky="w")
+table_frame.grid_columnconfigure(2, weight=1, minsize=150, uniform="entry_width")
+
+# Create the window inside the canvas for the table
+canvas.create_window((0, 0), window=table_frame, anchor="nw")
+
+# Grid canvas and scrollbar
+canvas.grid(row=30, column=0, columnspan=3, pady=10, padx=1)
+scrollbar.grid(row=30, column=2, sticky="nse")
+scrollbarX.grid(row=30, column=0, columnspan=3, sticky="ewn")
+
+# Table headers
+headers = ["Type","Entity", "Observed", "Note", "Action"]
+for col, text in enumerate(headers):
+    label = ctk.CTkLabel(table_frame, text=text, font=("Arial", 14, "bold"))
+    label.grid(row=0, column=col, padx=20, pady=5, sticky="w")
+
+table_frame.update_idletasks()
+canvas.config(scrollregion=canvas.bbox("all"))
+
+    #Example: Create a 2x2 grid for buttons at the bottom of the right frame
+button_1 = ctk.CTkButton(general_tab, text="Save Case as", width=100, command=lambda: save_note(2), height=20, fg_color="#4C9CD7", hover_color="#368BB7", font=("Verdana", 12, "bold"))
+button_2 = ctk.CTkButton(general_tab, text="Next Case", width=100, command=next_case, height=20, fg_color="#4CAF50", hover_color="#45A049", font=("Verdana", 12, "bold"))
+button_3 = ctk.CTkButton(general_tab, text="Copy All", width=100, command=copy_to_clipboard, height=20, fg_color="#166534", hover_color="#22c55e", font=("Verdana", 12, "bold"))
+button_4 = ctk.CTkButton(general_tab, text="Clear", width=100, command=clear_input, height=20, fg_color="#F44336", hover_color="#D32F2F", font=("Verdana", 12, "bold"))
+
+button_url = ctk.CTkButton(general_tab, text="Sanatize URLs", width=100, command=lambda: core_functions.miscFuncs.sanitize_urls(note_area), height=20, fg_color="#d97706", hover_color="#f59e0b", font=("Verdana", 12, "bold"))
+button_url.grid(row=20, column=0, padx=2, pady=2, sticky="ew")  # Top-left button
+
+esc_button = ctk.CTkButton(general_tab, text="Escalate Case", width=100, command=lambda: plugins.escalation_builder.run(case_entities_list, get_alert_name()), height=20, fg_color="#d97706", hover_color="#f59e0b", font=("Verdana", 12, "bold"))
+esc_button.grid(row=20, column=1, padx=2, pady=2, sticky="ew")  # Top-left button
+
+
+# Add buttons to a 2x2 grid layout at the bottom of the right frame
+button_1.grid(row=22, column=0, padx=2, pady=2, sticky="ew")  # Top-left button
+button_2.grid(row=22, column=1, padx=2, pady=2, sticky="ew")  # Top-right button
+button_3.grid(row=21, column=1, padx=2, pady=2, sticky="ew")  # Bottom-left button
+button_4.grid(row=21, column=0, padx=2, pady=2, sticky="ew")  # Bottom-right button
+
+
+for tab in [general_tab, email_tab, search_tab]:
+    tab.grid_rowconfigure(0, weight=1)
+    tab.grid_columnconfigure(0, weight=1)
+log_debug_action(f"GUI loaded")
+
+
+compare_versions(1)
+populate_cases_menu()
+root.after(3000, check_spelling)
+
+update_status_message("All Modules Loaded!")
+root.mainloop()
 
 
 
