@@ -31,11 +31,11 @@ def run(ents=[], alert=""):
     def create_teams_msg(): 
         # Get the current date
         current_date = datetime.now()
-
+        ryan = settings.get("esc_sign_name")
         # Format the date as 'Date: DD/MM/YYYY'
         formatted_date = current_date.strftime("Date: %d/%m/%Y")
         teams_text_raw = (
-            f"Analyst Assigned: {settings.get("esc_sign_name")} ",
+            f"Analyst Assigned: {ryan}", # Ryan your a legend for fixing this <3 
             f"Reviewed By: ",
             f"Case Link: ",
             f"Date: {formatted_date}",
