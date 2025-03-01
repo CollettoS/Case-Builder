@@ -166,9 +166,13 @@ def format_data(unformatted_data, ip):
         elif "proxycheck" in data:
             #print(data)
             working_data = data["proxycheck"][ip]
-            formatted_data["asn"] = working_data["asn"]
-            formatted_data["organisation"] = working_data["organisation"]
             formatted_data["proxycheck_risk_score"] = working_data["risk"]
+            if "asn" in working_data:
+                formatted_data["asn"] = working_data["asn"]
+            if "organisation" in working_data: 
+                formatted_data["organisation"] = working_data["organisation"]
+            #if "type" in working_data:
+            #    formatted_data["proxycheck_type"] = working_data["type"]
             if working_data["proxy"] == 'yes':
                 formatted_data["proxy"].append(True)
             if working_data["vpn"] == 'yes':
@@ -243,6 +247,9 @@ def get_detections(data):
     if bogon:
         # Check to see if the address is illegitimate (not officially assigned by an internet registration institute)
         detections.append("Bogon")
+        
+    #if "proxycheck_type" in data:
+    #    detections.append(data['proxycheck_type'])
 
     return detections
 
@@ -254,10 +261,10 @@ def get_reputation(data, confidence):
     known_attacker = data["known_attacker"]
     known_abuser = data["known_abuser"]
     known_threat = data["known_threat"]
-    malicious = data["malicious_count"] > 0  # return true if count greater than 0
+    #malicious = data["malicious_count"] > 0  # return true if count greater than 0
 
-    if malicious:
-        reputation.append("Malicious")
+    #if malicious:
+    #    reputation.append("Malicious")
 
     if known_abuser or confidence >= 66:
         reputation.append("Abusive")
@@ -294,6 +301,7 @@ def check_if_address_is_public(data):
 
 def lookup(ip_address):
 
+    insert_text("") # padding
     data = scan_ip(ip_address)
     public_address = check_if_address_is_public(data)
 
@@ -303,13 +311,14 @@ def lookup(ip_address):
         defanged_domain = defang(data["domain"])
         usage_type = data["usage"]
         isp = data["isp"]
-        asn = data["asn"]
         organisation = data["organisation"]
         city = data["city"]
         region = data["region"]
         country = data["country"]
 
-        insert_text(f"    - ASN: {asn}")
+        if "asn" in data:
+            asn = data["asn"]
+            insert_text(f"    - ASN: {asn}")
         insert_text(f"    - Domain: {defanged_domain}")
         insert_text(f"    - ISP: {isp} ({usage_type})")
         insert_text(f"    - Organisation: {organisation}")
@@ -319,6 +328,7 @@ def lookup(ip_address):
         proxycheck_risk_score = data["proxycheck_risk_score"]
         malicious_reports = data["malicious_count"]
         confidence = data["confidence"]
+        malicious = data["malicious_count"] > 0  # return true if count greater than 0
         whitelisted = data["whitelisted"]
         blocklists = data["blocklists"]
 
@@ -339,6 +349,8 @@ def lookup(ip_address):
                 formatted_reputation = list_to_string(reputation)
                 insert_text(f"    - Reputation: {formatted_reputation}")
                 check_total_abuse_reports(abuse_reports)
+                
+            if malicious:
                 check_total_malicious_reports(malicious_reports)
 
             if blocklists:
@@ -351,7 +363,7 @@ def lookup(ip_address):
             elif not reputation and confidence > 0 and proxycheck_risk_score > 0:
                 assess_abuse_confidence(abuse_reports, confidence, proxycheck_risk_score)
 
-            elif not reputation and confidence == 0 and not blocklists:
+            elif not reputation and confidence == 0 and not blocklists and not malicious:
                 insert_text("    - Non-malicious")
 
     else:
